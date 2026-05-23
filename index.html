@@ -1,0 +1,568 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CAPTCHA</title>
+  <style>
+    :root {
+      --blue: #1a73e8;
+      --border: #dadce0;
+      --text: #202124;
+      --muted: #5f6368;
+      --card: #ffffff;
+      --success: #188038;
+      --error: #d93025;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: Arial, Helvetica, sans-serif;
+      background: #f1f3f4;
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+
+    .wrapper {
+      width: min(430px, 100%);
+      display: grid;
+      gap: 14px;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    h1 {
+      font-size: 18px;
+      margin: 0;
+      font-weight: 700;
+      letter-spacing: 0.3px;
+    }
+
+    .controls {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    button.control {
+      border: 1px solid var(--border);
+      background: var(--card);
+      color: var(--text);
+      border-radius: 4px;
+      padding: 7px 10px;
+      font-size: 12px;
+      cursor: pointer;
+      box-shadow: 0 1px 2px rgba(60, 64, 67, 0.12);
+    }
+
+    button.control.primary {
+      background: var(--blue);
+      border-color: var(--blue);
+      color: white;
+      font-weight: 700;
+    }
+
+    button.control:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .captcha-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 3px;
+      box-shadow: 0 2px 8px rgba(60, 64, 67, 0.18);
+      overflow: hidden;
+    }
+
+    .captcha-header {
+      background: var(--blue);
+      color: white;
+      padding: 12px 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+    }
+
+    .captcha-title {
+      font-size: 20px;
+      font-weight: 700;
+      margin: 0 0 3px 0;
+      letter-spacing: 0.4px;
+    }
+
+    .captcha-subtitle {
+      font-size: 12px;
+      margin: 0;
+      opacity: 0.95;
+    }
+
+    .status-pill {
+      background: rgba(255, 255, 255, 0.16);
+      border: 1px solid rgba(255, 255, 255, 0.34);
+      border-radius: 2px;
+      padding: 7px 10px;
+      font-size: 12px;
+      white-space: nowrap;
+    }
+
+    .task-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      padding: 11px 14px;
+      border-bottom: 1px solid var(--border);
+      background: #fff;
+    }
+
+    .instruction {
+      font-size: 14px;
+      font-weight: 700;
+    }
+
+    .sequence {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      margin-left: 8px;
+    }
+
+    .mini-shape {
+      width: 17px;
+      height: 17px;
+      display: inline-block;
+      vertical-align: middle;
+    }
+
+    .mini-circle { border-radius: 50%; background: #ea4335; }
+
+    .mini-triangle {
+      width: 0;
+      height: 0;
+      border-left: 9px solid transparent;
+      border-right: 9px solid transparent;
+      border-bottom: 17px solid #fbbc04;
+    }
+
+    .mini-square {
+      background: #34a853;
+      border-radius: 3px;
+    }
+
+    .timer {
+      font-size: 22px;
+      color: var(--blue);
+      font-weight: 800;
+      font-variant-numeric: tabular-nums;
+      min-width: 118px;
+      text-align: center;
+      background: #eef4ff;
+      border: 1px solid rgba(26, 115, 232, 0.22);
+      border-radius: 4px;
+      padding: 6px 8px;
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,0.7);
+    }
+
+    .play-area {
+      position: relative;
+      height: 360px;
+      background-color: #f7f7f7;
+      background-image:
+        radial-gradient(circle at 12px 18px, rgba(32, 33, 36, 0.18) 1.1px, transparent 1.6px),
+        radial-gradient(circle at 31px 7px, rgba(26, 115, 232, 0.14) 1px, transparent 1.5px),
+        repeating-linear-gradient(24deg, rgba(60, 64, 67, 0.055) 0 1px, transparent 1px 16px),
+        repeating-linear-gradient(118deg, rgba(60, 64, 67, 0.05) 0 1px, transparent 1px 19px);
+      background-size: 36px 36px, 30px 30px, 100% 100%, 100% 100%;
+      overflow: hidden;
+    }
+
+    .play-area::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background-image:
+        linear-gradient(90deg, rgba(255,255,255,0.34) 0 2px, transparent 2px 100%),
+        linear-gradient(180deg, rgba(255,255,255,0.26) 0 2px, transparent 2px 100%);
+      background-size: 56px 56px;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .noise-char {
+      position: absolute;
+      color: rgba(32, 33, 36, 0.18);
+      font-weight: 700;
+      font-size: 20px;
+      transform: rotate(var(--rotate));
+      user-select: none;
+      pointer-events: none;
+      z-index: 1;
+    }
+
+    .shape-button {
+      position: absolute;
+      border: 0;
+      padding: 0;
+      cursor: pointer;
+      transition: transform 0.08s ease, opacity 0.12s ease;
+      filter: drop-shadow(0 2px 4px rgba(60, 64, 67, 0.30));
+      background: transparent;
+      z-index: 2;
+    }
+
+    .shape-button:hover { transform: scale(1.08); }
+    .shape-button:active { transform: scale(0.96); }
+    .shape-button.clicked {
+      opacity: 0.22;
+      pointer-events: none;
+      filter: grayscale(1);
+    }
+
+    .circle { border-radius: 50%; background: #ea4335; }
+    .square { background: #34a853; border-radius: 5px; }
+
+    .triangle {
+      width: 0 !important;
+      height: 0 !important;
+      border-left: var(--tri-half) solid transparent;
+      border-right: var(--tri-half) solid transparent;
+      border-bottom: var(--tri-size) solid #fbbc04;
+      background: transparent;
+      filter: drop-shadow(0 2px 4px rgba(60, 64, 67, 0.30));
+    }
+
+    .feedback {
+      position: absolute;
+      left: 16px;
+      bottom: 14px;
+      max-width: 74%;
+      background: rgba(255,255,255,0.94);
+      border: 1px solid var(--border);
+      border-radius: 3px;
+      padding: 9px 11px;
+      font-size: 13px;
+      box-shadow: 0 2px 6px rgba(60, 64, 67, 0.14);
+      color: var(--muted);
+      z-index: 3;
+      backdrop-filter: blur(4px);
+    }
+
+    .feedback.success { color: var(--success); border-color: rgba(24, 128, 56, 0.25); }
+    .feedback.error { color: var(--error); border-color: rgba(217, 48, 37, 0.25); }
+
+    .footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 14px;
+      border-top: 1px solid var(--border);
+      color: var(--muted);
+      font-size: 12px;
+      background: #fff;
+    }
+
+    .results {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 3px;
+      padding: 10px 12px;
+      box-shadow: 0 1px 4px rgba(60, 64, 67, 0.12);
+      display: grid;
+      gap: 7px;
+    }
+
+    .results h2 { margin: 0; font-size: 15px; }
+
+    .results-row {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      color: var(--muted);
+      font-variant-numeric: tabular-nums;
+      font-size: 13px;
+    }
+
+    .results-row span {
+      background: #f8fafd;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 7px 9px;
+    }
+
+    .results-row strong {
+      color: var(--blue);
+      font-size: 18px;
+      margin-left: 4px;
+    }
+
+    @media (max-width: 720px) {
+      .topbar, .task-row, .captcha-header, .footer {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+      .timer { text-align: left; }
+      .play-area { height: 340px; }
+    }
+  </style>
+</head>
+<body>
+  <main class="wrapper">
+    <div class="topbar">
+      <h1>CAPTCHA</h1>
+      <div class="controls">
+        <button class="control primary" id="nextBtn" disabled>Next challenge</button>
+        <button class="control" id="resetBtn">Restart</button>
+      </div>
+    </div>
+
+    <section class="captcha-card" aria-label="CAPTCHA demo">
+      <div class="captcha-header">
+        <div>
+          <p class="captcha-title">CAPTCHA</p>
+          <p class="captcha-subtitle">Complete the verification challenge below.</p>
+        </div>
+        <div class="status-pill" id="challengeLabel">Challenge 1 of 2</div>
+      </div>
+
+      <div class="task-row">
+        <div class="instruction">
+          Select in order:
+          <span class="sequence" aria-label="red circle, yellow triangle, green square">
+            <span class="mini-shape mini-circle" title="red circle"></span>
+            <span>→</span>
+            <span class="mini-shape mini-triangle" title="yellow triangle"></span>
+            <span>→</span>
+            <span class="mini-shape mini-square" title="green square"></span>
+          </span>
+        </div>
+        <div class="timer" id="timer">00.00 s</div>
+      </div>
+
+      <div class="play-area" id="playArea">        <div class="feedback" id="feedback">Get ready...</div>
+      </div>
+
+      <div class="footer">
+        <span>Verification challenge</span>
+        <span id="progressText">0 / 3 selected</span>
+      </div>
+    </section>
+
+    <section class="results" id="results">
+      <h2>Recorded times</h2>
+      <div class="results-row">
+        <span>Challenge 1: <strong id="time1">—</strong></span>
+        <span>Challenge 2: <strong id="time2">—</strong></span>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const playArea = document.getElementById('playArea');
+    const feedback = document.getElementById('feedback');
+    const timer = document.getElementById('timer');
+    const progressText = document.getElementById('progressText');
+    const challengeLabel = document.getElementById('challengeLabel');
+    const nextBtn = document.getElementById('nextBtn');
+    const resetBtn = document.getElementById('resetBtn');
+    const time1 = document.getElementById('time1');
+    const time2 = document.getElementById('time2');
+    const order = ['circle', 'triangle', 'square'];
+    let challengeIndex = 0;
+    let expectedIndex = 0;
+    let startTime = null;
+    let animationId = null;
+    let running = false;    let times = [null, null];
+    const challenges = [
+      {
+        shapes: [
+          { type: 'circle', size: 72, x: 118, y: 104 },
+          { type: 'triangle', size: 72, x: 215, y: 160 },
+          { type: 'square', size: 72, x: 238, y: 82 }
+        ]
+      },
+      {
+        shapes: [
+          { type: 'circle', size: 15, x: 22, y: 26 },
+          { type: 'triangle', size: 15, x: 365, y: 40 },
+          { type: 'square', size: 15, x: 370, y: 315 }
+        ]
+      }
+    ];
+
+    function clampLayout(shape, areaRect) {
+      const maxX = Math.max(0, areaRect.width - shape.size - 10);
+      const maxY = Math.max(0, areaRect.height - shape.size - 10);
+      return {
+        ...shape,
+        x: Math.min(Math.max(8, shape.x), maxX),
+        y: Math.min(Math.max(8, shape.y), maxY)
+      };
+    }
+
+    function clearAreaElements() {
+      [...playArea.querySelectorAll('.shape-button, .noise-char')].forEach(el => el.remove());
+    }
+
+    function addCaptchaNoise() {
+      const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+      const areaRect = playArea.getBoundingClientRect();
+      for (let i = 0; i < 30; i++) {
+        const span = document.createElement('span');
+        span.className = 'noise-char';
+        span.textContent = chars[Math.floor(Math.random() * chars.length)];
+        span.style.left = `${Math.random() * Math.max(1, areaRect.width - 20)}px`;
+        span.style.top = `${Math.random() * Math.max(1, areaRect.height - 20)}px`;
+        span.style.setProperty('--rotate', `${-32 + Math.random() * 64}deg`);
+        span.style.opacity = `${0.28 + Math.random() * 0.32}`;
+        playArea.appendChild(span);
+      }
+    }
+
+    function jitterForFirstChallenge(shape) {
+      if (challengeIndex !== 0) return shape;
+      const jitterX = (Math.random() - 0.5) * 24;
+      const jitterY = (Math.random() - 0.5) * 18;
+      return { ...shape, x: shape.x + jitterX, y: shape.y + jitterY };
+    }
+
+    function createShape(shape) {
+      const button = document.createElement('button');
+      button.className = `shape-button ${shape.type}`;
+      button.dataset.type = shape.type;
+      button.setAttribute('aria-label', shape.type);
+      button.style.left = `${shape.x}px`;
+      button.style.top = `${shape.y}px`;
+
+      if (shape.type === 'triangle') {
+        button.style.setProperty('--tri-half', `${shape.size / 2}px`);
+        button.style.setProperty('--tri-size', `${shape.size}px`);
+      } else {
+        button.style.width = `${shape.size}px`;
+        button.style.height = `${shape.size}px`;
+      }
+
+      button.addEventListener('click', () => handleShapeClick(button));
+      playArea.appendChild(button);
+    }
+
+    function renderChallenge(autoStart = false) {
+      clearAreaElements();
+      addCaptchaNoise();
+      expectedIndex = 0;
+      running = false;
+      timer.textContent = '00.00 s';
+      progressText.textContent = '0 / 3 selected';
+      challengeLabel.textContent = `Challenge ${challengeIndex + 1} of 2`;
+      nextBtn.disabled = true;
+
+      feedback.className = 'feedback';
+      feedback.textContent = 'Select the shapes in the displayed order.';
+
+      const areaRect = playArea.getBoundingClientRect();
+      const challenge = challenges[challengeIndex];
+      challenge.shapes.forEach(s => createShape(clampLayout(jitterForFirstChallenge(s), areaRect)));
+
+      if (autoStart) startChallengeTimer();
+    }
+
+    function startChallengeTimer() {
+      // The challenge is active, but the timer starts only when the user makes the first click.
+      // This avoids counting waiting time.
+      running = true;
+      startTime = null;
+      timer.textContent = '00.00 s';
+      feedback.className = 'feedback';
+      feedback.textContent = 'Select the shapes in the displayed order.';
+      cancelAnimationFrame(animationId);
+    }
+
+    function tick() {
+      if (!running || startTime === null) return;
+      const elapsed = (performance.now() - startTime) / 1000;
+      timer.textContent = `${elapsed.toFixed(2)} s`;
+      animationId = requestAnimationFrame(tick);
+    }
+
+    function handleShapeClick(button) {
+      if (!running) return;
+
+      if (startTime === null) {
+        startTime = performance.now();
+        tick();
+      }
+
+      const clickedType = button.dataset.type;
+      const expectedType = order[expectedIndex];
+
+      if (clickedType !== expectedType) {
+        feedback.className = 'feedback error';
+        feedback.textContent = 'Incorrect selection. Continue in the displayed order.';
+        return;
+      }
+
+      button.classList.add('clicked');
+      expectedIndex += 1;
+      progressText.textContent = `${expectedIndex} / 3 selected`;
+
+      if (expectedIndex === order.length) {
+        completeChallenge();
+      } else {
+        feedback.className = 'feedback';
+        feedback.textContent = 'Continue with the next shape.';
+      }
+    }
+
+    function completeChallenge() {
+      running = false;
+      cancelAnimationFrame(animationId);
+      const elapsed = startTime === null ? 0 : (performance.now() - startTime) / 1000;
+      times[challengeIndex] = elapsed;
+      timer.textContent = `${elapsed.toFixed(2)} s`;
+      if (challengeIndex === 0) time1.textContent = `${elapsed.toFixed(2)} s`;
+      if (challengeIndex === 1) time2.textContent = `${elapsed.toFixed(2)} s`;
+      feedback.className = 'feedback success';
+      feedback.textContent = 'Verification complete.';
+      nextBtn.disabled = challengeIndex >= 1;
+    }
+
+    function nextChallenge() {
+      if (challengeIndex < 1) {
+        challengeIndex += 1;
+        renderChallenge(true);
+      }
+    }
+
+    function resetAll() {
+      running = false;
+      cancelAnimationFrame(animationId);
+      challengeIndex = 0;
+      expectedIndex = 0;
+      times = [null, null];
+      time1.textContent = '—';
+      time2.textContent = '—';
+      renderChallenge(true);
+    }
+
+    nextBtn.addEventListener('click', nextChallenge);
+    resetBtn.addEventListener('click', resetAll);
+    window.addEventListener('resize', () => renderChallenge(!running));
+
+    renderChallenge(true);
+  </script>
+</body>
+</html>
